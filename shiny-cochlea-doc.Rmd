@@ -1,0 +1,301 @@
+---
+title: "Shiny Cochlea"
+author: "Benjamin Gansemer"
+date: "6/5/2023"
+output: html_document
+---
+
+# Shiny App code testing
+
+This file contains code for generating data files for the `shiny` app and shows 
+examples of plots/visualizations that are present in the app.
+
+```{r setup, include=FALSE}
+library(ggplot2)
+library(purrr)
+library(tidyverse)
+library(reshape2)
+library(ComplexHeatmap)
+library(circlize)
+library(viridis)
+library(tictoc)
+
+```
+
+## Microarray Data Import
+```{r}
+#normalized expr values from microarray
+norm_expr_orig <- as.matrix(read.delim("data-files/microarray-norm-expr.txt",
+                                       header = T, row.names = 1))
+
+#gene annotation for genes in the array
+gene_info <- read.delim("app-files/NM-symb-name.txt", stringsAsFactors = F) 
+
+#convert rownames from refseq to gene symbol
+rownames(norm_expr_orig) <- unlist(lapply(rownames(norm_expr_orig), 
+                                          function(x) {gene_info$SYMBOL[which(x == gene_info$SEQ_ID)]}))
+
+#average duplicate genes
+norm_expr_avg <- aggregate(norm_expr_orig, by = list(row.names(norm_expr_orig)), FUN=mean)
+
+#write to txt for use by shiny app
+write_delim(norm_expr_avg, file = "app-files/normalized_expr_avg.txt", delim="\t")
+norm_expr <- read.delim("app-files/normalized_expr_avg.txt", header = T, row.names = 1)
+
+#generate experimental design info and write to txt for use by shiny app
+design_info <- data.frame(Sample=colnames(norm_expr))
+rownames(design_info) <- colnames(norm_expr)
+
+design_info[ ,2] <- rep(c("P32DA", "P32DB", "P32HA", "P32HB", "P60DA", "P60DB", "P60HA", "P60HB"),
+                   each=3)
+colnames(design_info)[2] <- "Condition"
+
+design_info[ ,3] <- rep(c("P32deaf", "P32hearing", "P60deaf", "P60hearing"), each=6)
+colnames(design_info)[3] <- "age_HD"
+
+design_info[ ,4] <- rep(c("P32A", "P32B", "P32A", "P32B", "P60A","P60B", "P60A", "P60B"), 
+                   each=3)
+colnames(design_info)[4] <- "age_location"
+
+design_info[ ,5] <- rep(c("P32", "P60"), each=12)
+colnames(design_info)[5] <- "age"
+
+design_info[ ,6] <- rep(c("Deaf", "Hearing", "Deaf", "Hearing"), each = 6)
+colnames(design_info)[6] <- "Hear_Deaf"
+
+#write for use by shiny app
+write_delim(design_info, "app-files/design-info.txt", delim = "\t")
+
+
+design_info <- read.delim("app-files/design-info.txt", header = T, row.names = 1)
+
+#specify groupings for plotting
+groupingLoc <- c("P32A", "P32B", "P32A", "P32B", "P60A","P60B", "P60A", "P60B")
+groupingNoLoc <- c("P32", "P32", "P60", "P60")
+hearDeafLoc <- rep(c("Deaf", "Hearing", "Deaf", "Hearing"), each=2)
+hearDeafNoLoc <- c("Deaf", "Hearing", "Deaf", "Hearing")
+
+```
+
+## Functions for getting plot data
+```{r data-functions}
+
+SEM <- function(x) {
+    sd(x)/sqrt(length(x))
+}
+#testing column graphs
+getGeneInfo <- function(gene, data, design){
+    
+    #make sure gene is in dataset
+    if (length(which(gene == rownames(data)) == 1)) {
+        gene_data <- as.data.frame(t(data[which(gene == rownames(data)), ]))
+        colnames(gene_data)[1] <- "value"
+        gene_data[,2] <- design$Condition
+        colnames(gene_data)[2] <- "Condition"
+        gene_data[,3] <- design$age_location
+        colnames(gene_data)[3] <- "age_location"
+        gene_data[,4] <- design$age_HD
+        colnames(gene_data)[4] <- "age_HD"
+        gene_data[,5] <- design$age
+        colnames(gene_data)[5] <- "age"
+        gene_data[,6] <- design$Hear_Deaf
+        colnames(gene_data)[6] <- "Hear_Deaf"
+        
+        #get averages by location
+        gene_mean_loc <- aggregate(gene_data[,1], by = list(Condition=gene_data$Condition), FUN = mean)
+        colnames(gene_mean_loc)[2] <- gene
+        
+        #get averages by hearing and deaf
+        gene_mean_hd <- aggregate(gene_data[,1], 
+                                 by = list(Condition=gene_data$age_HD), FUN = mean)
+        colnames(gene_mean_hd)[2] <- gene
+        
+        #get SEM by location
+        gene_sem_loc <- aggregate(gene_data[,1], 
+                                by = list(Condition=gene_data$Condition), FUN = SEM)
+        colnames(gene_sem_loc)[2] <- gene
+        
+        #get SEM by hearing and deaf
+        gene_sem_hd <- aggregate(gene_data[,1], 
+                               by = list(Condition=gene_data$age_HD), FUN = SEM)
+        colnames(gene_sem_hd)[2] <- gene
+        
+        #melt the dataframes
+        mean_melt_loc <- melt(gene_mean_loc, id.vars = c("Condition"), 
+                             variable.name = "gene", value.name = "value")
+        mean_melt_loc[,4] <- groupingLoc
+        colnames(mean_melt_loc)[4] <- "age_location"
+        mean_melt_loc[,5] <- hearDeafLoc
+        colnames(mean_melt_loc)[5] <- "Hear_Deaf"
+        
+        mean_melt_hd <- melt(gene_mean_hd, id.vars = c("Condition"), 
+                            variable.name = "gene", value.name = "value")
+        mean_melt_hd[,4] <- groupingNoLoc
+        colnames(mean_melt_hd)[4] <- "age"
+        mean_melt_hd[,5] <- hearDeafNoLoc
+        colnames(mean_melt_hd)[5] <- "Hear_Deaf"
+        
+        sd.meltLoc <- melt(gene_sem_loc, id.vars = c("Condition"), 
+                           variable.name = "gene", value.name = "value")
+        sd.meltLoc[,4] <- groupingLoc
+        colnames(sd.meltLoc)[4] <- "age_location"
+        sd.meltHD <- melt(gene_sem_hd, id.vars = c("Condition"), 
+                          variable.name = "gene", value.name = "value")
+        sd.meltHD[,4] <- groupingNoLoc
+        colnames(sd.meltHD)[4] <- "age"
+        
+        #set factor levels
+        gene_data$Condition <- factor(gene_data$Condition, levels = c("P32HA", "P32DA", "P32HB", "P32DB", "P60HA", "P60DA", "P60HB", "P60DB"), ordered = T)
+        gene_data$age_HD <- factor(gene_data$age_HD, levels = c("P32hearing", "P32deaf", "P60hearing", "P60deaf"), ordered = T)
+        gene_data$Hear_Deaf <- factor(gene_data$Hear_Deaf, levels = c("Hearing", "Deaf"), ordered = T)
+        mean_melt_loc$Condition <- factor(mean_melt_loc$Condition, levels = c("P32HA", "P32DA", "P32HB", "P32DB", "P60HA", "P60DA", "P60HB", "P60DB"), ordered = T)
+        mean_melt_loc$Hear_Deaf <- factor(mean_melt_loc$Hear_Deaf, levels = c("Hearing", "Deaf"), ordered = T)
+        mean_melt_hd$Condition <- factor(mean_melt_hd$Condition, levels = c("P32hearing", "P32deaf", "P60hearing", "P60deaf"), ordered = T)
+        mean_melt_hd$Hear_Deaf <- factor(mean_melt_hd$Hear_Deaf, levels = c("Hearing", "Deaf"), ordered = T)
+
+        return(list(gene_data, mean_melt_loc, mean_melt_hd, sd.meltLoc, sd.meltHD))
+    } else {
+        print("Gene not found")
+    }
+}
+
+testgene_info <- getGeneInfo("C3", norm_expr, design_info)
+testgene_data <- as.data.frame(testgene_info[1])
+testgene_mean_loc <- as.data.frame(testgene_info[2])
+testgene_mean_hd <- as.data.frame(testgene_info[3])
+testgene_sem_loc <- as.data.frame(testgene_info[4])
+testgene_sem_hd <- as.data.frame(testgene_info[5])
+test_limits_loc <- aes(ymax = testgene_mean_loc[, "value"] + testgene_sem_loc[, "value"], ymin = testgene_mean_loc[, "value"] - testgene_sem_loc[, "value"])
+testlimitsHD <- aes(ymax = testgene_mean_hd[, "value"] + testgene_sem_hd[, "value"], ymin = testgene_mean_hd[, "value"] - testgene_sem_hd[, "value"])
+
+```
+
+## Testing plot formation using `ggplot2`
+```{r example-plots}
+#figure out colors at some point
+testcolGraph <- ggplot(testgene_mean_loc, aes(age_location, value, fill = Hear_Deaf)) + 
+                geom_bar(position="dodge", stat = "identity") + 
+                geom_errorbar(test_limits_loc, position = "dodge") + 
+                labs(y = "Normalized Expression", title="Gene") + 
+                scale_fill_manual(values = c("darkorchid4", "darkorange2")) +
+                theme(plot.title = element_text(hjust = 0.5), text = element_text(size = 20))
+
+testcolGraph2 <- ggplot(testgene_mean_hd, aes(age, value, fill = Hear_Deaf)) + 
+                geom_bar(position = "dodge", stat = "identity") + 
+                #geom_point(data = testgene_data, aes(age_HD, value)) +
+                geom_errorbar(testlimitsHD, position = "dodge") + 
+                labs(y = "Normalized Expression", title="Gene") + 
+                scale_fill_manual(values = c("darkorchid4", "darkorange2")) +
+                theme(plot.title = element_text(hjust = 0.5), text = element_text(size = 20))
+
+testGraph <- ggplot(testgene_mean_hd, aes(Condition, value, fill = Hear_Deaf)) + 
+                geom_bar(position = "dodge", stat = "identity") + 
+                geom_point(data = testgene_data, aes(age_HD, value)) +
+                geom_errorbar(testlimitsHD, position = "dodge") + 
+                labs(y = "Normalized Expression", title="Gene") + 
+                scale_fill_manual(values = c("darkorchid4", "darkorange2")) +
+                theme(plot.title = element_text(hjust = 0.5), text = element_text(size = 20))
+
+
+testboxPlot <- ggplot(testgene_data, aes(age_location, value, fill=Hear_Deaf)) + geom_boxplot() +
+    labs(y = "Normalized Expression", title="Gene") + 
+    scale_fill_manual(values = c("darkorchid4", "darkorange2")) +
+    theme(plot.title = element_text(hjust = 0.5), text = element_text(size = 20))
+
+testboxPlot2 <- ggplot(testgene_data, aes(age_HD, value, fill=Hear_Deaf)) + geom_boxplot() +
+    labs(y = "Normalized Expression", title="Gene") + 
+    theme(plot.title = element_text(hjust = 0.5), text = element_text(size = 20))
+
+```
+
+## Testing heatmap generation using `ComplexHeatmap`
+```{r}
+#load in GO BP annotation and generate annotation file to read into app
+GO_anno <- read.delim("GO_annotation.txt", stringsAsFactors = F)
+GO_terms <- as.data.frame(GO_anno[,1:2])
+GO_terms_unique <- unique(GO_terms)
+
+write_delim(GO_terms_unique, path = "./microarray-app/GOids_terms.txt", delim = "\t")
+t <- read.delim("./GOids_terms.txt", stringsAsFactors = F)
+
+GO_ids_unique <- GO_terms_unique
+GO_ids_unique[,2] <- NULL
+
+makeGOlist <- function (symbols, ids, uniqID) {
+
+  temp <- sapply(uniqID$Term.Accession, function(x, ids, symbols) {
+    index <- which(x == ids)
+    genes <- sapply(index, function(y) { symbols[y ]})
+      }, ids, symbols )
+  df <- as.data.frame(do.call(cbind, temp), stringsAsFactors = F)
+  for (i in 1:ncol(df)){
+    df[, i][duplicated(df[,i])] <- NA
+  }
+  return(df)
+}
+
+GO_table <- makeGOlist(GO_anno$Symbol, GO_anno$Term.Accession, GO_ids_unique)
+
+write_delim(GO_table, path = "./microarray-app/GO_terms.txt", delim = "\t")
+GO_table2 <- as.data.frame((read.delim("./microarray-app/GO_terms.txt", stringsAsFactors = F)))
+colnames(GO_table2) <- gsub("\\.", ":", colnames(GO_table2))
+
+#load in GO CC annotation and generate annotation file to read into app
+CC_anno <- read.delim("CC_annotation.txt", stringsAsFactors = F)
+CC_terms <- as.data.frame(CC_anno[,1:2])
+CC_terms_unique <- unique(CC_terms) 
+
+write_delim(CC_terms_unique, path = "./microarray-app/CCids_terms.txt", delim = "\t")
+
+CC_ids_unique <- CC_terms_unique
+CC_ids_unique[,2] <- NULL
+
+CC_table <- makeGOlist(CC_anno$Symbol, CC_anno$Term.Accession, CC_ids_unique)
+write_delim(CC_table, path = "./microarray-app/CC_terms.txt", delim = "\t")
+
+#testing scripts to generate lists of genes to make heatmap out of
+get.geneMatrix <- function(GOid, GOanno, exprData) {
+    
+    #get list of genes based on provided GO term ID
+    geneList <- GOanno[, GOid][!is.na(GOanno[, GOid])]
+    
+    #get matrix of expr for genes in geneList
+    geneMatrix <- as.matrix(exprData[ geneList, ])
+    geneMatrix <- geneMatrix[complete.cases(geneMatrix), ]
+    geneMatrix <- log2(geneMatrix)
+    geneMatrix <- geneMatrix - rowMeans(geneMatrix)
+    return(geneMatrix)
+}
+
+norm_expr.copy <- norm_expr
+newColnames <- c("E32DA1", "E32DA2", "E32DA3", "F32DB1", "F32DB2", "F32DB3", "A32HA1", "A32HA2", "A32HA3", 
+                 "B32HB1", "B32HB3", "B32HB3", "G60DA1", "G60DA2", "G60DA3", "H60DB1", "H60DB2", "H60DB3", 
+                 "C60HA1", "C60HA2", "C60HA3", "D60HB1", "D60HB2", "D60HB3")
+colnames(norm_expr.copy) <- newColnames
+
+#set up annotation for the heatmaps
+anno <- data.frame(condition = rep(c("P32D", "P32H", "P60D", "P60H"), each=6), row.names = rownames(designInfo))
+HManno <- HeatmapAnnotation(apex_base = rep(c("apex", "base", "apex", "base", "apex", "base", "apex", "base"), each = 3), df=anno, name = "arrayanno", col = list(condition = c("P32D"="darkorange", "P32H"="darkorchid2", "P60D"="darkorange2", "P60H"="darkorchid4"), apex_base = c("apex" = "gray80", "base" = "gray50")), annotation_legend_param = list(nrow = 2))
+
+#generate a copy matrix and change colnames for ordering in heatmaps and change rownames to gene symbols instead of refseq ids
+norm_expr.copy <- norm_expr
+newColnames <- c("E32DA1", "E32DA2", "E32DA3", "F32DB1", "F32DB2", "F32DB3", "A32HA1", "A32HA2", "A32HA3", "B32HB1", "B32HB3", "B32HB3", "G60DA1", "G60DA2", "G60DA3", "H60DB1", "H60DB2", "H60DB3", "C60HA1", "C60HA2", "C60HA3", "D60HB1", "D60HB2", "D60HB3")
+colnames(norm_expr.copy) <- newColnames
+
+#change expr values to z-scores?
+
+
+#blbkrd = colorRamp2(c(-1, 0, 1), c("blue", "black", "red")) #set colors for heatmap
+blwtrd = colorRamp2(c(-2, 0, 2), c('blue', 'white', 'red')) #color scheme 2 for heatmaps
+
+test <- get.geneMatrix("GO:0006956", GO_table, norm_expr.copy)
+
+Gterm <- t$Term[which("GO:0006956" == t$Term.Accession)]
+
+HM <- Heatmap(test, column_title = "GOterm", column_title_gp = gpar(fontsize = 20), top_annotation = HManno, 
+                      col = blwtrd, show_column_dend = FALSE, show_column_names = FALSE, cluster_columns = FALSE, 
+                      column_order = order(colnames(test)),  
+                      heatmap_legend_param = list(legend_direction = "horizontal", title = "expr", border = "dark grey"))
+#draw(HM, heatmap_legend_side = "bottom", annotation_legend_side = "bottom", merge_legend = T)
+
+```
