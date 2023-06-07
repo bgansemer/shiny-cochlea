@@ -207,3 +207,95 @@ testboxPlot2 <- ggplot(testgene_data, aes(age_HD, value, fill=Hear_Deaf)) + geom
     theme(plot.title = element_text(hjust = 0.5), text = element_text(size = 20))
 
 ```
+
+## Testing heatmap generation using `ComplexHeatmap`
+```{r}
+#load in GO BP annotation and generate annotation file to read into app
+GO_anno <- read.delim("GO_annotation.txt", stringsAsFactors = F)
+GO_terms <- as.data.frame(GO_anno[,1:2])
+GO_terms_unique <- unique(GO_terms)
+
+write_delim(GO_terms_unique, path = "./microarray-app/GOids_terms.txt", delim = "\t")
+t <- read.delim("./GOids_terms.txt", stringsAsFactors = F)
+
+GO_ids_unique <- GO_terms_unique
+GO_ids_unique[,2] <- NULL
+
+makeGOlist <- function (symbols, ids, uniqID) {
+
+  temp <- sapply(uniqID$Term.Accession, function(x, ids, symbols) {
+    index <- which(x == ids)
+    genes <- sapply(index, function(y) { symbols[y ]})
+      }, ids, symbols )
+  df <- as.data.frame(do.call(cbind, temp), stringsAsFactors = F)
+  for (i in 1:ncol(df)){
+    df[, i][duplicated(df[,i])] <- NA
+  }
+  return(df)
+}
+
+GO_table <- makeGOlist(GO_anno$Symbol, GO_anno$Term.Accession, GO_ids_unique)
+
+write_delim(GO_table, path = "./microarray-app/GO_terms.txt", delim = "\t")
+GO_table2 <- as.data.frame((read.delim("./microarray-app/GO_terms.txt", stringsAsFactors = F)))
+colnames(GO_table2) <- gsub("\\.", ":", colnames(GO_table2))
+
+#load in GO CC annotation and generate annotation file to read into app
+CC_anno <- read.delim("CC_annotation.txt", stringsAsFactors = F)
+CC_terms <- as.data.frame(CC_anno[,1:2])
+CC_terms_unique <- unique(CC_terms) 
+
+write_delim(CC_terms_unique, path = "./microarray-app/CCids_terms.txt", delim = "\t")
+
+CC_ids_unique <- CC_terms_unique
+CC_ids_unique[,2] <- NULL
+
+CC_table <- makeGOlist(CC_anno$Symbol, CC_anno$Term.Accession, CC_ids_unique)
+write_delim(CC_table, path = "./microarray-app/CC_terms.txt", delim = "\t")
+
+#testing scripts to generate lists of genes to make heatmap out of
+getGeneMatrix <- function(GOid, GOanno, exprData) {
+    
+    #get list of genes based on provided GO term ID
+    geneList <- GOanno[, GOid][!is.na(GOanno[, GOid])]
+    
+    #get matrix of expr for genes in geneList
+    geneMatrix <- as.matrix(exprData[ geneList, ])
+    geneMatrix <- geneMatrix[complete.cases(geneMatrix), ]
+    geneMatrix <- log2(geneMatrix)
+    geneMatrix <- geneMatrix - rowMeans(geneMatrix)
+    return(geneMatrix)
+}
+
+norm_expr.copy <- norm_expr
+newColnames <- c("E32DA1", "E32DA2", "E32DA3", "F32DB1", "F32DB2", "F32DB3", "A32HA1", "A32HA2", "A32HA3", 
+                 "B32HB1", "B32HB3", "B32HB3", "G60DA1", "G60DA2", "G60DA3", "H60DB1", "H60DB2", "H60DB3", 
+                 "C60HA1", "C60HA2", "C60HA3", "D60HB1", "D60HB2", "D60HB3")
+colnames(norm_expr.copy) <- newColnames
+
+#set up annotation for the heatmaps
+anno <- data.frame(condition = rep(c("P32D", "P32H", "P60D", "P60H"), each=6), row.names = rownames(designInfo))
+HManno <- HeatmapAnnotation(apex_base = rep(c("apex", "base", "apex", "base", "apex", "base", "apex", "base"), each = 3), df=anno, name = "arrayanno", col = list(condition = c("P32D"="darkorange", "P32H"="darkorchid2", "P60D"="darkorange2", "P60H"="darkorchid4"), apex_base = c("apex" = "gray80", "base" = "gray50")), annotation_legend_param = list(nrow = 2))
+
+#generate a copy matrix and change colnames for ordering in heatmaps and change rownames to gene symbols instead of refseq ids
+norm_expr.copy <- norm_expr
+newColnames <- c("E32DA1", "E32DA2", "E32DA3", "F32DB1", "F32DB2", "F32DB3", "A32HA1", "A32HA2", "A32HA3", "B32HB1", "B32HB3", "B32HB3", "G60DA1", "G60DA2", "G60DA3", "H60DB1", "H60DB2", "H60DB3", "C60HA1", "C60HA2", "C60HA3", "D60HB1", "D60HB2", "D60HB3")
+colnames(norm_expr.copy) <- newColnames
+
+#change expr values to z-scores?
+
+
+#blbkrd = colorRamp2(c(-1, 0, 1), c("blue", "black", "red")) #set colors for heatmap
+blwtrd = colorRamp2(c(-2, 0, 2), c('blue', 'white', 'red')) #color scheme 2 for heatmaps
+
+test <- getGeneMatrix("GO:0006956", GO_table, norm_expr.copy)
+
+Gterm <- t$Term[which("GO:0006956" == t$Term.Accession)]
+
+HM <- Heatmap(test, column_title = "GOterm", column_title_gp = gpar(fontsize = 20), top_annotation = HManno, 
+                      col = blwtrd, show_column_dend = FALSE, show_column_names = FALSE, cluster_columns = FALSE, 
+                      column_order = order(colnames(test)),  
+                      heatmap_legend_param = list(legend_direction = "horizontal", title = "expr", border = "dark grey"))
+#draw(HM, heatmap_legend_side = "bottom", annotation_legend_side = "bottom", merge_legend = T)
+
+```

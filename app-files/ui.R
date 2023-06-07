@@ -47,30 +47,30 @@ ui <- fluidPage(
     ),
     
     
-    # fluidRow(
-    #     column(4,
-    #            radioButtons("GOcat", "GO category:",
-    #                         c("Biological Process" = "BP",
-    #                           "Cellular Component" = "CC")),
-    #            textInput("GOtermInput", "Enter GO term id"),
-    #            ),
-    #     column(8,
-    #            plotOutput("heatmap"),
-    #            ),
-    # )
+    fluidRow(
+        column(4,
+               radioButtons("GOcat", "GO category:",
+                            c("Biological Process" = "BP",
+                              "Cellular Component" = "CC")),
+               textInput("GOtermInput", "Enter GO term id"),
+               ),
+        column(8,
+               plotOutput("heatmap"),
+               ),
+    )
     
-    # sidebarLayout(
-    #     sidebarPanel(
-    #         textInput("geneInput", "Enter gene symbol"),
-    #         selectInput("graphType", "Select graph type",
-    #                     choices = c("column graph", "boxplot")),
-    #         selectInput("groupInput", "select groupings",
-    #                     choices = c("age and location", "age only")),
-    #         textInput("GOtermInput", "enter GO term ID"),
-    #     ),
-    #     mainPanel(
-    #         plotOutput("expressionPlot"),
-    #         br(), br(),
-    #         tableOutput("expressionTable"),
-    #     ),
+    sidebarLayout(
+        sidebarPanel(
+            textInput("geneInput", "Enter gene symbol"),
+            selectInput("graphType", "Select graph type",
+                        choices = c("column graph", "boxplot")),
+            selectInput("groupInput", "select groupings",
+                        choices = c("age and location", "age only")),
+            textInput("GOtermInput", "enter GO term ID"),
+        ),
+        mainPanel(
+            plotOutput("expressionPlot"),
+            br(), br(),
+            tableOutput("expressionTable"),
+        ),
 )
