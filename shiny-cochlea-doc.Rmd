@@ -22,68 +22,13 @@ library(tictoc)
 
 ```
 
-## Microarray Data Import
-```{r}
-#normalized expr values from microarray
-norm_expr_orig <- as.matrix(read.delim("data-files/microarray-norm-expr.txt",
-                                       header = T, row.names = 1))
-
-#gene annotation for genes in the array
-gene_info <- read.delim("app-files/NM-symb-name.txt", stringsAsFactors = F) 
-
-#convert rownames from refseq to gene symbol
-rownames(norm_expr_orig) <- unlist(lapply(rownames(norm_expr_orig), 
-                                          function(x) {gene_info$SYMBOL[which(x == gene_info$SEQ_ID)]}))
-
-#average duplicate genes
-norm_expr_avg <- aggregate(norm_expr_orig, by = list(row.names(norm_expr_orig)), FUN=mean)
-
-#write to txt for use by shiny app
-write_delim(norm_expr_avg, file = "app-files/normalized_expr_avg.txt", delim="\t")
-norm_expr <- read.delim("app-files/normalized_expr_avg.txt", header = T, row.names = 1)
-
-#generate experimental design info and write to txt for use by shiny app
-design_info <- data.frame(Sample=colnames(norm_expr))
-rownames(design_info) <- colnames(norm_expr)
-
-design_info[ ,2] <- rep(c("P32DA", "P32DB", "P32HA", "P32HB", "P60DA", "P60DB", "P60HA", "P60HB"),
-                   each=3)
-colnames(design_info)[2] <- "Condition"
-
-design_info[ ,3] <- rep(c("P32deaf", "P32hearing", "P60deaf", "P60hearing"), each=6)
-colnames(design_info)[3] <- "age_HD"
-
-design_info[ ,4] <- rep(c("P32A", "P32B", "P32A", "P32B", "P60A","P60B", "P60A", "P60B"), 
-                   each=3)
-colnames(design_info)[4] <- "age_location"
-
-design_info[ ,5] <- rep(c("P32", "P60"), each=12)
-colnames(design_info)[5] <- "age"
-
-design_info[ ,6] <- rep(c("Deaf", "Hearing", "Deaf", "Hearing"), each = 6)
-colnames(design_info)[6] <- "Hear_Deaf"
-
-#write for use by shiny app
-write_delim(design_info, "app-files/design-info.txt", delim = "\t")
-
-
-design_info <- read.delim("app-files/design-info.txt", header = T, row.names = 1)
-
-#specify groupings for plotting
-groupingLoc <- c("P32A", "P32B", "P32A", "P32B", "P60A","P60B", "P60A", "P60B")
-groupingNoLoc <- c("P32", "P32", "P60", "P60")
-hearDeafLoc <- rep(c("Deaf", "Hearing", "Deaf", "Hearing"), each=2)
-hearDeafNoLoc <- c("Deaf", "Hearing", "Deaf", "Hearing")
-
-```
-
-## Functions for getting plot data
-```{r data-functions}
+## Functions used in the app or for data processing
+```{r functions}
 
 SEM <- function(x) {
     sd(x)/sqrt(length(x))
 }
-#testing column graphs
+
 getGeneInfo <- function(gene, data, design){
     
     #make sure gene is in dataset
@@ -159,6 +104,92 @@ getGeneInfo <- function(gene, data, design){
     }
 }
 
+makeGOlist <- function (symbols, ids, uniqID) {
+
+  temp <- sapply(uniqID$Term.Accession, function(x, ids, symbols) {
+    index <- which(x == ids)
+    genes <- sapply(index, function(y) { symbols[y ]})
+      }, ids, symbols )
+  df <- as.data.frame(do.call(cbind, temp), stringsAsFactors = F)
+  for (i in 1:ncol(df)){
+    df[, i][duplicated(df[,i])] <- NA
+  }
+  return(df)
+}
+
+getGeneMatrix <- function(GOid, GOanno, exprData) {
+    
+    #get list of genes based on provided GO term ID
+    geneList <- GOanno[, GOid][!is.na(GOanno[, GOid])]
+    
+    #get matrix of expr for genes in geneList
+    geneMatrix <- as.matrix(exprData[ geneList, ])
+    geneMatrix <- geneMatrix[complete.cases(geneMatrix), ]
+    geneMatrix <- log2(geneMatrix)
+    geneMatrix <- geneMatrix - rowMeans(geneMatrix)
+    return(geneMatrix)
+}
+
+```
+
+## Microarray Data Import
+```{r data-import}
+#normalized expr values from microarray
+norm_expr_orig <- as.matrix(read.delim("data-files/microarray-norm-expr.txt",
+                                       header = T, row.names = 1))
+
+#gene annotation for genes in the array
+gene_info <- read.delim("app-files/NM-symb-name.txt", stringsAsFactors = F) 
+
+#convert rownames from refseq to gene symbol
+rownames(norm_expr_orig) <- unlist(lapply(rownames(norm_expr_orig), 
+                                          function(x) {gene_info$SYMBOL[which(x == gene_info$SEQ_ID)]}))
+
+#average duplicate genes
+norm_expr_avg <- aggregate(norm_expr_orig, by = list(row.names(norm_expr_orig)), FUN=mean)
+
+#write to txt for use by shiny app
+write_delim(norm_expr_avg, file = "app-files/normalized_expr_avg.txt", delim="\t")
+norm_expr <- read.delim("app-files/normalized_expr_avg.txt", header = T, row.names = 1)
+
+#generate experimental design info and write to txt for use by shiny app
+design_info <- data.frame(Sample=colnames(norm_expr))
+rownames(design_info) <- colnames(norm_expr)
+
+design_info[ ,2] <- rep(c("P32DA", "P32DB", "P32HA", "P32HB", "P60DA", "P60DB", "P60HA", "P60HB"),
+                   each=3)
+colnames(design_info)[2] <- "Condition"
+
+design_info[ ,3] <- rep(c("P32deaf", "P32hearing", "P60deaf", "P60hearing"), each=6)
+colnames(design_info)[3] <- "age_HD"
+
+design_info[ ,4] <- rep(c("P32A", "P32B", "P32A", "P32B", "P60A","P60B", "P60A", "P60B"), 
+                   each=3)
+colnames(design_info)[4] <- "age_location"
+
+design_info[ ,5] <- rep(c("P32", "P60"), each=12)
+colnames(design_info)[5] <- "age"
+
+design_info[ ,6] <- rep(c("Deaf", "Hearing", "Deaf", "Hearing"), each = 6)
+colnames(design_info)[6] <- "Hear_Deaf"
+
+#write for use by shiny app
+write_delim(design_info, "app-files/design-info.txt", delim = "\t")
+
+
+design_info <- read.delim("app-files/design-info.txt", header = T, row.names = 1)
+
+#specify groupings for plotting
+groupingLoc <- c("P32A", "P32B", "P32A", "P32B", "P60A","P60B", "P60A", "P60B")
+groupingNoLoc <- c("P32", "P32", "P60", "P60")
+hearDeafLoc <- rep(c("Deaf", "Hearing", "Deaf", "Hearing"), each=2)
+hearDeafNoLoc <- c("Deaf", "Hearing", "Deaf", "Hearing")
+
+```
+
+## Getting test plot data
+```{r test-data}
+
 testgene_info <- getGeneInfo("C3", norm_expr, design_info)
 testgene_data <- as.data.frame(testgene_info[1])
 testgene_mean_loc <- as.data.frame(testgene_info[2])
@@ -209,64 +240,26 @@ testboxPlot2 <- ggplot(testgene_data, aes(age_HD, value, fill=Hear_Deaf)) + geom
 ```
 
 ## Testing heatmap generation using `ComplexHeatmap`
-```{r}
+```{r generate-GO-anno}
 #load in GO BP annotation and generate annotation file to read into app
-GO_anno <- read.delim("GO_annotation.txt", stringsAsFactors = F)
-GO_terms <- as.data.frame(GO_anno[,1:2])
+GO_anno <- read.delim("data-files/GOBPannotation.tab", stringsAsFactors = F)
+GO_terms <- subset(GO_anno, select = c("Term.Accession", "Term"))
 GO_terms_unique <- unique(GO_terms)
 
-write_delim(GO_terms_unique, path = "./microarray-app/GOids_terms.txt", delim = "\t")
+write_delim(GO_terms_unique, path = "./app-files/GOids_terms.txt", 
+            delim = "\t")
 t <- read.delim("./GOids_terms.txt", stringsAsFactors = F)
 
 GO_ids_unique <- GO_terms_unique
 GO_ids_unique[,2] <- NULL
 
-makeGOlist <- function (symbols, ids, uniqID) {
-
-  temp <- sapply(uniqID$Term.Accession, function(x, ids, symbols) {
-    index <- which(x == ids)
-    genes <- sapply(index, function(y) { symbols[y ]})
-      }, ids, symbols )
-  df <- as.data.frame(do.call(cbind, temp), stringsAsFactors = F)
-  for (i in 1:ncol(df)){
-    df[, i][duplicated(df[,i])] <- NA
-  }
-  return(df)
-}
-
 GO_table <- makeGOlist(GO_anno$Symbol, GO_anno$Term.Accession, GO_ids_unique)
 
-write_delim(GO_table, path = "./microarray-app/GO_terms.txt", delim = "\t")
-GO_table2 <- as.data.frame((read.delim("./microarray-app/GO_terms.txt", stringsAsFactors = F)))
+write_delim(GO_table, path = "./app-files/GO_terms.txt", delim = "\t")
+GO_table2 <- as.data.frame((read.delim("./app-files/GO_terms.txt", stringsAsFactors = F)))
 colnames(GO_table2) <- gsub("\\.", ":", colnames(GO_table2))
 
-#load in GO CC annotation and generate annotation file to read into app
-CC_anno <- read.delim("CC_annotation.txt", stringsAsFactors = F)
-CC_terms <- as.data.frame(CC_anno[,1:2])
-CC_terms_unique <- unique(CC_terms) 
-
-write_delim(CC_terms_unique, path = "./microarray-app/CCids_terms.txt", delim = "\t")
-
-CC_ids_unique <- CC_terms_unique
-CC_ids_unique[,2] <- NULL
-
-CC_table <- makeGOlist(CC_anno$Symbol, CC_anno$Term.Accession, CC_ids_unique)
-write_delim(CC_table, path = "./microarray-app/CC_terms.txt", delim = "\t")
-
-#testing scripts to generate lists of genes to make heatmap out of
-getGeneMatrix <- function(GOid, GOanno, exprData) {
-    
-    #get list of genes based on provided GO term ID
-    geneList <- GOanno[, GOid][!is.na(GOanno[, GOid])]
-    
-    #get matrix of expr for genes in geneList
-    geneMatrix <- as.matrix(exprData[ geneList, ])
-    geneMatrix <- geneMatrix[complete.cases(geneMatrix), ]
-    geneMatrix <- log2(geneMatrix)
-    geneMatrix <- geneMatrix - rowMeans(geneMatrix)
-    return(geneMatrix)
-}
-
+#make copy of expression data to organize for heatmaps
 norm_expr.copy <- norm_expr
 newColnames <- c("E32DA1", "E32DA2", "E32DA3", "F32DB1", "F32DB2", "F32DB3", "A32HA1", "A32HA2", "A32HA3", 
                  "B32HB1", "B32HB3", "B32HB3", "G60DA1", "G60DA2", "G60DA3", "H60DB1", "H60DB2", "H60DB3", 
