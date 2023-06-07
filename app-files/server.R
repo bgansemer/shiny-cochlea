@@ -32,24 +32,24 @@ library(viridis)
 norm_expr <- read.delim("normalized_expr_avg.txt", header = T, row.names = 1)
 gene_info <- read.delim("NM-symb-name.txt", stringsAsFactors = F)
 designInfo <- read.delim("design-info.txt", header = T, row.names = 1)
-GO_table <- as.data.frame(read.delim("GO_terms.txt", stringsAsFactors = F))
-colnames(GO_table) <- gsub("\\.", ":", colnames(GO_table))
-CC_table <- as.data.frame(read.delim("./CC_terms.txt", stringsAsFactors = F))
-colnames(CC_table) <- gsub("\\.", ":", colnames(CC_table))
-anno <- data.frame(condition = rep(c("P32D", "P32H", "P60D", "P60H"), each=6), row.names = rownames(designInfo))
-HManno <- HeatmapAnnotation(apex_base = rep(c("apex", "base", "apex", "base", "apex", "base", "apex", "base"), each = 3), 
-                df=anno, name = "arrayanno", col = list(condition = c("P32D"="darkorange", "P32H"="darkorchid2", 
-                "P60D"="darkorange2", "P60H"="darkorchid4"), apex_base = c("apex" = "gray80", "base" = "gray50")), 
-                annotation_legend_param = list(nrow = 2))
+# GO_table <- as.data.frame(read.delim("GO_terms.txt", stringsAsFactors = F))
+# colnames(GO_table) <- gsub("\\.", ":", colnames(GO_table))
+# CC_table <- as.data.frame(read.delim("./CC_terms.txt", stringsAsFactors = F))
+# colnames(CC_table) <- gsub("\\.", ":", colnames(CC_table))
+# anno <- data.frame(condition = rep(c("P32D", "P32H", "P60D", "P60H"), each=6), row.names = rownames(designInfo))
+# HManno <- HeatmapAnnotation(apex_base = rep(c("apex", "base", "apex", "base", "apex", "base", "apex", "base"), each = 3), 
+#                 df=anno, name = "arrayanno", col = list(condition = c("P32D"="darkorange", "P32H"="darkorchid2", 
+#                 "P60D"="darkorange2", "P60H"="darkorchid4"), apex_base = c("apex" = "gray80", "base" = "gray50")), 
+#                 annotation_legend_param = list(nrow = 2))
 
-norm_expr.copy <- norm_expr
-newColnames <- c("E32DA1", "E32DA2", "E32DA3", "F32DB1", "F32DB2", "F32DB3", "A32HA1", "A32HA2", "A32HA3", 
-                 "B32HB1", "B32HB3", "B32HB3", "G60DA1", "G60DA2", "G60DA3", "H60DB1", "H60DB2", "H60DB3", 
-                 "C60HA1", "C60HA2", "C60HA3", "D60HB1", "D60HB2", "D60HB3")
-colnames(norm_expr.copy) <- newColnames
-
-GOterms <- read.delim("./GOids_terms.txt", stringsAsFactors = F)
-CCterms <- read.delim("./CCids_terms.txt", stringsAsFactors = F)
+# norm_expr.copy <- norm_expr
+# newColnames <- c("E32DA1", "E32DA2", "E32DA3", "F32DB1", "F32DB2", "F32DB3", "A32HA1", "A32HA2", "A32HA3", 
+#                  "B32HB1", "B32HB3", "B32HB3", "G60DA1", "G60DA2", "G60DA3", "H60DB1", "H60DB2", "H60DB3", 
+#                  "C60HA1", "C60HA2", "C60HA3", "D60HB1", "D60HB2", "D60HB3")
+# colnames(norm_expr.copy) <- newColnames
+# 
+# GOterms <- read.delim("./GOids_terms.txt", stringsAsFactors = F)
+# CCterms <- read.delim("./CCids_terms.txt", stringsAsFactors = F)
 
 #define necessary variables
 groupingLoc <- c("P32A", "P32B", "P32A", "P32B", "P60A","P60B", "P60A", "P60B")
@@ -138,20 +138,20 @@ getGeneInfo <- function(gene, data, design){
   }
 }
 
-get.geneMatrix <- function(GOid, GOanno, exprData) {
-    
-    #get list of genes based on provided GO term ID
-    geneList <- GOanno[, GOid][!is.na(GOanno[, GOid])]
-    
-    #get matrix of expr for genes in geneList
-    geneMatrix <- as.matrix(exprData[ geneList, ])
-    geneMatrix <- geneMatrix[complete.cases(geneMatrix), ]
-    geneMatrix <- log2(geneMatrix)
-    geneMatrix <- geneMatrix - rowMeans(geneMatrix)
-    return(geneMatrix)
-}
+# getGeneMatrix <- function(GOid, GOanno, exprData) {
+#     
+#     #get list of genes based on provided GO term ID
+#     geneList <- GOanno[, GOid][!is.na(GOanno[, GOid])]
+#     
+#     #get matrix of expr for genes in geneList
+#     geneMatrix <- as.matrix(exprData[ geneList, ])
+#     geneMatrix <- geneMatrix[complete.cases(geneMatrix), ]
+#     geneMatrix <- log2(geneMatrix)
+#     geneMatrix <- geneMatrix - rowMeans(geneMatrix)
+#     return(geneMatrix)
+# }
 
-blwtrd = colorRamp2(c(-2, 0, 2), c('blue', 'white', 'red')) #color scheme for heatmaps
+#blwtrd = colorRamp2(c(-2, 0, 2), c('blue', 'white', 'red')) #color scheme for heatmaps
 
 # Define server logic required to draw plots and generate tables
 server <- function(input, output) {
@@ -163,36 +163,35 @@ server <- function(input, output) {
         getGeneInfo(input$geneInput, norm_expr, designInfo)
     })
     
-    geneMatrix <- reactive({
-        validate(
-            need(input$GOtermInput != "", "Please enter a GO term ID")
-        )
-        if (input$GOcat == "BP"){
-            get.geneMatrix(input$GOtermInput, GO_table, norm_expr.copy)
-        } else if (input$GOcat == "CC") {
-            get.geneMatrix(input$GOtermInput, CC_table, norm_expr.copy)   
-        }
-    })
-    
-    term <- reactive({
-        validate(
-            need(input$GOtermInput != "", "Please enter a GO term ID")
-        )
-        if (input$GOcat == "BP") {
-            GOterms$Term[which(input$GOtermInput == GOterms$Term.Accession)]
-        } else if (input$GOcat == "CC") {
-            CCterms$Term[which(input$GOtermInput == CCterms$Term.Accession)]
-        }
-    })
+    # geneMatrix <- reactive({
+    #     validate(
+    #         need(input$GOtermInput != "", "Please enter a GO term ID")
+    #     )
+    #     if (input$GOcat == "BP"){
+    #         getGeneMatrix(input$GOtermInput, GO_table, norm_expr.copy)
+    #     } else if (input$GOcat == "CC") {
+    #         getGeneMatrix(input$GOtermInput, CC_table, norm_expr.copy)   
+    #     }
+    # })
+    # 
+    # term <- reactive({
+    #     validate(
+    #         need(input$GOtermInput != "", "Please enter a GO term ID")
+    #     )
+    #     if (input$GOcat == "BP") {
+    #         GOterms$Term[which(input$GOtermInput == GOterms$Term.Accession)]
+    #     } else if (input$GOcat == "CC") {
+    #         CCterms$Term[which(input$GOtermInput == CCterms$Term.Accession)]
+    #     }
+    # })
     
     #generate graph based on gene
     output$expressionPlot <- renderPlot({
-        #need to catch gene not found error  
-      
-        if (is.null(geneInfo())) {
-            return()
-        } 
-        
+
+      if (class(geneInfo()) == "character") {
+        return(ggplot() + theme_void() + 
+                 labs(title = "Gene not found"))
+      } else {
         #get gene expression info
         geneData <- as.data.frame(geneInfo()[1])
         geneMeanLoc <- as.data.frame(geneInfo()[2])
@@ -235,10 +234,11 @@ server <- function(input, output) {
             }
         }
         return(expr_plot)
+      }
     }) #closes output$expresssionPlot
     output$expressionTable1 <- renderTable({
         
-        if (is.null(geneInfo()[1])){
+        if (is.null(geneInfo())){
             return()
         }
         
@@ -268,13 +268,21 @@ server <- function(input, output) {
         colnames(gene.expr2) <- cols2[13:24]
         gene.expr2
     })
-    output$heatmap <- renderPlot({
-        HM <- Heatmap(geneMatrix(), column_title = paste(input$GOtermInput, term(), sep = " "), column_title_gp = gpar(fontsize = 20), top_annotation = HManno, 
-                      col = blwtrd, show_column_dend = FALSE, show_column_names = FALSE, cluster_columns = FALSE, 
-                      column_order = order(colnames(geneMatrix())),  
-                      heatmap_legend_param = list(legend_direction = "horizontal", title = "log2 norm expr", border = "gray30"))
-        draw(HM, heatmap_legend_side = "bottom", annotation_legend_side = "bottom", merge_legends = T)
-    })
+    
+    
+    # output$heatmap <- renderPlot({
+    #   
+    #   if (class(geneMatrix() == "character")) {
+    #     return(ggplot() + theme_void() + 
+    #              labs(title = "Gene not found"))
+    #   } else {
+    #     HM <- Heatmap(geneMatrix(), column_title = paste(input$GOtermInput, term(), sep = " "), column_title_gp = gpar(fontsize = 20), top_annotation = HManno, 
+    #                   col = blwtrd, show_column_dend = FALSE, show_column_names = FALSE, cluster_columns = FALSE, 
+    #                   column_order = order(colnames(geneMatrix())),  
+    #                   heatmap_legend_param = list(legend_direction = "horizontal", title = "log2 norm expr", border = "gray30"))
+    #     draw(HM, heatmap_legend_side = "bottom", annotation_legend_side = "bottom", merge_legends = T)
+    #   }
+    # })
     
 }
 

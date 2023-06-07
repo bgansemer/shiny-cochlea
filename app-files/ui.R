@@ -46,17 +46,19 @@ ui <- fluidPage(
                ),
     ),
     
-    fluidRow(
-        column(4,
-               radioButtons("GOcat", "GO category:",
-                            c("Biological Process" = "BP",
-                              "Cellular Component" = "CC")),
-               textInput("GOtermInput", "Enter GO term id"),
-               ),
-        column(8,
-               plotOutput("heatmap"),
-               ),
-    )
+    
+    # fluidRow(
+    #     column(4,
+    #            radioButtons("GOcat", "GO category:",
+    #                         c("Biological Process" = "BP",
+    #                           "Cellular Component" = "CC")),
+    #            textInput("GOtermInput", "Enter GO term id"),
+    #            ),
+    #     column(8,
+    #            plotOutput("heatmap"),
+    #            ),
+    # )
+    
     # sidebarLayout(
     #     sidebarPanel(
     #         textInput("geneInput", "Enter gene symbol"),
