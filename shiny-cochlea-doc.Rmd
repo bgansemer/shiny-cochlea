@@ -240,40 +240,77 @@ testboxPlot2 <- ggplot(testgene_data, aes(age_HD, value, fill=Hear_Deaf)) + geom
 ```
 
 ## Testing heatmap generation using `ComplexHeatmap`
-```{r generate-GO-anno}
+```{r generate-GO-files, eval = FALSE}
 #load in GO BP annotation and generate annotation file to read into app
-GO_anno <- read.delim("data-files/GOBPannotation.tab", stringsAsFactors = F)
-GO_terms <- subset(GO_anno, select = c("Term.Accession", "Term"))
-GO_terms_unique <- unique(GO_terms)
+bp_anno <- read.delim("data-files/GOBP_annotation.tab", stringsAsFactors = F) #full annotation from RGD
+bp_terms <- subset(bp_anno, select = c("Term.Accession", "Term")) #get only ids and temrs
+bp_terms_unique <- unique(bp_terms) #filter out duplicates
 
-write_delim(GO_terms_unique, path = "./app-files/GOids_terms.txt", 
-            delim = "\t")
-t <- read.delim("./GOids_terms.txt", stringsAsFactors = F)
+write_delim(bp_terms_unique, file = "./app-files/BPids_terms.txt", 
+            delim = "\t") #write to txt file
 
-GO_ids_unique <- GO_terms_unique
-GO_ids_unique[,2] <- NULL
+bp_ids_unique <- subset(bp_terms_unique, select = c("Term.Accession"))
 
-GO_table <- makeGOlist(GO_anno$Symbol, GO_anno$Term.Accession, GO_ids_unique)
+bp_table <- makeGOlist(bp_anno$Symbol, bp_anno$Term.Accession, bp_ids_unique)
 
-write_delim(GO_table, path = "./app-files/GO_terms.txt", delim = "\t")
-GO_table2 <- as.data.frame((read.delim("./app-files/GO_terms.txt", stringsAsFactors = F)))
-colnames(GO_table2) <- gsub("\\.", ":", colnames(GO_table2))
+write_delim(bp_table, file = "./app-files/GOBP_annotation.txt", delim = "\t")
 
+#repeat for GO CC annotation
+cc_anno <- read.delim("data-files/GOCC_annotation.tab", stringsAsFactors = F) #full annotation from RGD
+cc_terms <- subset(cc_anno, select = c("Term.Accession", "Term")) #get only ids and temrs
+cc_terms_unique <- unique(cc_terms) #filter out duplicates
+
+write_delim(cc_terms_unique, file = "./app-files/CCids_terms.txt", 
+            delim = "\t") #write to txt file
+
+cc_ids_unique <- subset(cc_terms_unique, select = c("Term.Accession"))
+
+cc_table <- makeGOlist(cc_anno$Symbol, cc_anno$Term.Accession, cc_ids_unique)
+
+write_delim(cc_table, file = "./app-files/GOCC_annotation.txt", delim = "\t") 
+
+#repeat for GO MF annotation
+mf_anno <- read.delim("data-files/GOMF_annotation.tab", stringsAsFactors = F) #full annotation from RGD
+mf_terms <- subset(mf_anno, select = c("Term.Accession", "Term")) #get only ids and temrs
+mf_terms_unique <- unique(mf_terms) #filter out duplicates
+
+write_delim(mf_terms_unique, file = "./app-files/MFids_terms.txt", 
+            delim = "\t") #write to txt file
+
+mf_ids_unique <- subset(mf_terms_unique, select = c("Term.Accession"))
+
+mf_table <- makeGOlist(mf_anno$Symbol, mf_anno$Term.Accession, mf_ids_unique)
+
+write_delim(mf_table, file = "./app-files/GOMF_annotation.txt", delim = "\t") 
+```
+
+```{r read-GO-data, include = FALSE}
+#read in go bp terms and ids for testing
+bp_terms <- read.delim("./app-files/BPids_terms.txt", 
+                       stringsAsFactors = F)
+
+#read in GO ID to gene annotations
+bp_table <- read.delim("./app-files/GOBP_annotation.txt",
+                                       stringsAsFactors = F)
+colnames(bp_table) <- gsub("\\.", ":", colnames(bp_table)) #reformat column names
+```
+
+```{r test-heatmaps}
 #make copy of expression data to organize for heatmaps
-norm_expr.copy <- norm_expr
+norm_expr_copy <- norm_expr
 newColnames <- c("E32DA1", "E32DA2", "E32DA3", "F32DB1", "F32DB2", "F32DB3", "A32HA1", "A32HA2", "A32HA3", 
                  "B32HB1", "B32HB3", "B32HB3", "G60DA1", "G60DA2", "G60DA3", "H60DB1", "H60DB2", "H60DB3", 
                  "C60HA1", "C60HA2", "C60HA3", "D60HB1", "D60HB2", "D60HB3")
-colnames(norm_expr.copy) <- newColnames
+colnames(norm_expr_copy) <- newColnames
 
 #set up annotation for the heatmaps
 anno <- data.frame(condition = rep(c("P32D", "P32H", "P60D", "P60H"), each=6), row.names = rownames(designInfo))
 HManno <- HeatmapAnnotation(apex_base = rep(c("apex", "base", "apex", "base", "apex", "base", "apex", "base"), each = 3), df=anno, name = "arrayanno", col = list(condition = c("P32D"="darkorange", "P32H"="darkorchid2", "P60D"="darkorange2", "P60H"="darkorchid4"), apex_base = c("apex" = "gray80", "base" = "gray50")), annotation_legend_param = list(nrow = 2))
 
 #generate a copy matrix and change colnames for ordering in heatmaps and change rownames to gene symbols instead of refseq ids
-norm_expr.copy <- norm_expr
+norm_expr_copy <- norm_expr
 newColnames <- c("E32DA1", "E32DA2", "E32DA3", "F32DB1", "F32DB2", "F32DB3", "A32HA1", "A32HA2", "A32HA3", "B32HB1", "B32HB3", "B32HB3", "G60DA1", "G60DA2", "G60DA3", "H60DB1", "H60DB2", "H60DB3", "C60HA1", "C60HA2", "C60HA3", "D60HB1", "D60HB2", "D60HB3")
-colnames(norm_expr.copy) <- newColnames
+colnames(norm_expr_copy) <- newColnames
 
 #change expr values to z-scores?
 
@@ -281,7 +318,7 @@ colnames(norm_expr.copy) <- newColnames
 #blbkrd = colorRamp2(c(-1, 0, 1), c("blue", "black", "red")) #set colors for heatmap
 blwtrd = colorRamp2(c(-2, 0, 2), c('blue', 'white', 'red')) #color scheme 2 for heatmaps
 
-test <- getGeneMatrix("GO:0006956", GO_table, norm_expr.copy)
+test <- getGeneMatrix("GO:0006956", bp_table, norm_expr_copy)
 
 Gterm <- t$Term[which("GO:0006956" == t$Term.Accession)]
 

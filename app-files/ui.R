@@ -21,10 +21,11 @@ ui <- fluidPage(
     
     # Application title and other information
     titlePanel("Transcriptomic analyis of the spiral ganglion of hearing and deafened rats"),
-    h3("Green Lab", "University of Iowa", "Department of Biology"),
-    h4("Data collected by Erin Bailey"),
-    h4("Data analyzed by Erin Bailey, Benjamin M. Gansemer, and Steven H. Green"),
-    h5("App written by Benjamin M. Gansemer"),
+    h3("Green Lab"),
+    h3("University of Iowa - Dept. of Biology"),
+    h5("Data collected by Erin Bailey"),
+    h5("Data analyzed by Erin Bailey, Benjamin M. Gansemer, and Steven H. Green"),
+    h6("App written by Benjamin M. Gansemer"),
     tags$a("Rahman, Bailey, Gansemer, et al. Anti-inflammatory Therapy Protects Spiral Ganglion Neurons After Aminoglycoside-Induced Hair Cell Loss. 2023. Neurotherapeutics.",
        href = "https://pubmed-ncbi-nlm-nih-gov.ezp3.lib.umn.edu/36697994/"),
     br(), br(),
@@ -50,7 +51,8 @@ ui <- fluidPage(
         sidebarPanel(
                radioButtons("gene_list", "Gene list type:",
                             c("GO Biological Process" = "BP",
-                              "Custom gene list" = "GL")),
+                              "GO Cellular Component" = "CC",
+                              "GO Molecular Function" = "MF")),
                textInput("GOtermInput", "Enter GO term id"),
                ),
         mainPanel(

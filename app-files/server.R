@@ -33,10 +33,15 @@ norm_expr <- read.delim("normalized_expr_avg.txt", header = T, row.names = 1)
 gene_info <- read.delim("NM-symb-name.txt", stringsAsFactors = F)
 designInfo <- read.delim("design-info.txt", header = T, row.names = 1)
 
-GO_table <- as.data.frame(read.delim("GO_terms.txt", stringsAsFactors = F))
-colnames(GO_table) <- gsub("\\.", ":", colnames(GO_table))
-CC_table <- as.data.frame(read.delim("./CC_terms.txt", stringsAsFactors = F))
-colnames(CC_table) <- gsub("\\.", ":", colnames(CC_table))
+bp_table <- as.data.frame(read.delim("GOBP_annotation.txt", stringsAsFactors = F))
+colnames(bp_table) <- gsub("\\.", ":", colnames(bp_table))
+
+cc_table <- as.data.frame(read.delim("GOCC_annotation.txt", stringsAsFactors = F))
+colnames(cc_table) <- gsub("\\.", ":", colnames(cc_table))
+
+mf_table <- as.data.frame(read.delim("GOMF_annotation.txt", stringsAsFactors = F))
+colnames(mf_table) <- gsub("\\.", ":", colnames(mf_table))
+
 anno <- data.frame(condition = rep(c("P32D", "P32H", "P60D", "P60H"), each=6), row.names = rownames(designInfo))
 HManno <- HeatmapAnnotation(apex_base = rep(c("apex", "base", "apex", "base", "apex", "base", "apex", "base"), each = 3),
                 df=anno, name = "arrayanno", col = list(condition = c("P32D"="darkorange", "P32H"="darkorchid2",
@@ -49,8 +54,9 @@ newColnames <- c("E32DA1", "E32DA2", "E32DA3", "F32DB1", "F32DB2", "F32DB3", "A3
                  "C60HA1", "C60HA2", "C60HA3", "D60HB1", "D60HB2", "D60HB3")
 colnames(norm_expr.copy) <- newColnames
 
-GOterms <- read.delim("./GOids_terms.txt", stringsAsFactors = F)
-CCterms <- read.delim("./CCids_terms.txt", stringsAsFactors = F)
+bp_terms <- read.delim("./BPids_terms.txt", stringsAsFactors = F)
+cc_terms <- read.delim("./CCids_terms.txt", stringsAsFactors = F)
+mf_terms <- read.delim("./MFids_terms.txt", stringsAsFactors = F)
 
 #define necessary variables
 groupingLoc <- c("P32A", "P32B", "P32A", "P32B", "P60A","P60B", "P60A", "P60B")
@@ -168,10 +174,12 @@ server <- function(input, output) {
         validate(
             need(input$GOtermInput != "", "Please enter a GO term ID")
         )
-        if (input$GOcat == "BP"){
-            getGeneMatrix(input$GOtermInput, GO_table, norm_expr.copy)
-        } else if (input$GOcat == "CC") {
-            getGeneMatrix(input$GOtermInput, CC_table, norm_expr.copy)
+        if (input$gene_list == "BP") {
+            getGeneMatrix(input$GOtermInput, bp_table, norm_expr.copy)
+        } else if (input$gene_list == "CC") {
+            getGeneMatrix(input$GOtermInput, cc_table, norm_expr.copy)
+        } else if (input$gene_list == "MF") {
+            getGeneMatrix(input$GOtermInput, mf_table, norm_expr.copy)
         }
     })
 
@@ -179,11 +187,14 @@ server <- function(input, output) {
         validate(
             need(input$GOtermInput != "", "Please enter a GO term ID")
         )
-        if (input$GOcat == "BP") {
-            GOterms$Term[which(input$GOtermInput == GOterms$Term.Accession)]
-        } else if (input$GOcat == "CC") {
-            CCterms$Term[which(input$GOtermInput == CCterms$Term.Accession)]
-        }
+      if (input$gene_list == "BP") {
+          bp_terms$Term[which(input$GOtermInput == bp_terms$Term.Accession)]
+      } else if (input$gene_list == "CC") {
+          cc_terms$Term[which(input$GOtermInput == cc_terms$Term.Accession)]
+      } else if (input$gene_list == "MF") {
+          mf_terms$Term[which(input$GOtermInput == mf_terms$Term.Accession)]
+      }
+      
     })
     
     #generate graph based on gene
@@ -205,6 +216,7 @@ server <- function(input, output) {
         limitsHD <- aes(ymax = geneMeanHD[, "value"] + geneSDHD[, "value"], ymin = geneMeanHD[, "value"] - geneSDHD[, "value"])
         
         #draw graphs
+        #eventually add individual replicates option
         if (input$graphType == "column graph"){
             if (input$groupInput == "age and location"){
             expr_plot <- ggplot(geneMeanLoc, aes(age_location, value, fill = Hear_Deaf)) + 
@@ -272,17 +284,17 @@ server <- function(input, output) {
     
     
     output$heatmap <- renderPlot({
-
-      if (class(geneMatrix() == "character")) {
-        return(ggplot() + theme_void() +
-                 labs(title = "Gene not found"))
-      } else {
+      #need to fix id not found error
+      # if (class(geneMatrix()) == "character") {
+      #   return(ggplot() + theme_void() +
+      #            labs(title = "GO ID not found"))
+      # } else {
         HM <- Heatmap(geneMatrix(), column_title = paste(input$GOtermInput, term(), sep = " "), column_title_gp = gpar(fontsize = 20), top_annotation = HManno,
                       col = blwtrd, show_column_dend = FALSE, show_column_names = FALSE, cluster_columns = FALSE,
                       column_order = order(colnames(geneMatrix())),
                       heatmap_legend_param = list(legend_direction = "horizontal", title = "log2 norm expr", border = "gray30"))
         draw(HM, heatmap_legend_side = "bottom", annotation_legend_side = "bottom", merge_legends = T)
-      }
+      #}
     })
     
 }

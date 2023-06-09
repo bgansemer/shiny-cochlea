@@ -2,9 +2,6 @@
 .Rhistory
 .RData
 .Ruserdata
-data-files/annotation.tab.gz
-data-files/CCannotation.tab
-app-files/CC_terms.txt
-app-files/CCids_terms.txt
-app-files/GO_terms.txt
-app-files/GOids_terms.txt
+data-files/GOBP_annotation.tab
+data-files/GOCC_annotation.tab
+data-files/GOMF_annotation.tab
